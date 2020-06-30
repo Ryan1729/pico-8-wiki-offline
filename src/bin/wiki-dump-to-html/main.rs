@@ -13,9 +13,16 @@ fn main() -> Res<()> {
 
     args.next(); // exe name
 
+    let mut verbose = false;
+
     while let Some(s) = args.next() {
         if s == "--help" {
             return print_usage();
+        }
+
+        if s == "--verbose" {
+            verbose = true;
+            continue;
         }
 
         let path = PathBuf::from(s);
@@ -26,34 +33,46 @@ fn main() -> Res<()> {
 
         let file = File::open(path)?;
 
-        process_file(file)?;
+        process_file(file, verbose)?;
     }
 
     Ok(())
 }
 
-fn process_file(file: File) -> Res<()> {
+fn process_file(file: File, verbose: bool) -> Res<()> {
     let file = std::io::BufReader::new(file);
 
     for result in parse_mediawiki_dump::parse(file) {
-        match result {
-            Err(error) => {
-                return Err(error.to_string().into());
+        let page = result.map_err(|e| e.to_string())?;
+
+        type Namespace = u32;
+        const TALK: Namespace = 1;
+        const USER: Namespace = 2;
+        const USER_TALK: Namespace = 3;
+
+        const MESSAGE_WALL: Namespace = 1200;
+        const THREAD: Namespace = 1201;
+        const MESSAGE_WALL_GREETING: Namespace = 1202;
+
+        match page.namespace {
+            TALK 
+            | USER 
+            | USER_TALK 
+            | MESSAGE_WALL 
+            | THREAD 
+            | MESSAGE_WALL_GREETING => {
+                if verbose {
+                    println!("Seems like the page {:?} is meta-content, not true content.", page.title);
+                    println!("{:#?}", page);
+                }
             }
-            Ok(page) => if page.namespace == 0 && match &page.format {
-                None => false,
-                Some(format) => format == "text/x-wiki"
-            } && match &page.model {
-                None => false,
-                Some(model) => model == "wikitext"
-            } {
+            _ => {
                 println!(
-                    "The page {title:?} is an ordinary article with byte length {length}.",
+                    "The page {title:?} seems to be a content article with byte length {length} and namespace {namespace}.",
                     title = page.title,
-                    length = page.text.len()
+                    length = page.text.len(),
+                    namespace = page.namespace
                 );
-            } else {
-                println!("The page {:?} has something special to it.", page.title);
             }
         }
     }
@@ -62,6 +81,6 @@ fn process_file(file: File) -> Res<()> {
 }
 
 fn print_usage() -> Res<()> {
-    println!("USAGE: wiki-dump-to-html file-name1 [file-name2 [...]]");
+    println!("USAGE: wiki-dump-to-html [--verbose] FILENAME1 [FILENAME2 [...]]");
     Ok(())
 }
