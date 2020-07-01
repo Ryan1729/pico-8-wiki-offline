@@ -118,10 +118,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "parse_wiki_text"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd59a245c58efa02bd73c9462fd9d4c28952d650092c6bcba43b60b4707171dd"
+
+[[package]]
 name = "pico-8-wiki-offline"
 version = "0.1.0"
 dependencies = [
  "parse_mediawiki_dump",
+ "parse_wiki_text",
 ]
 
 [[package]]

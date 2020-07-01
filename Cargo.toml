@@ -9,3 +9,4 @@ name = "wiki-dump-to-html"
 
 [dependencies]
 parse_mediawiki_dump = "0.1"
+parse_wiki_text = "0.1"

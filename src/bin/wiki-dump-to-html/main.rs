@@ -87,6 +87,12 @@ fn main() -> Res<()> {
 
     let mut writer = BufWriter::new(&index_file);
 
+    macro_rules! w {
+        ($($tokens: tt)*) => {
+            write!(&mut writer, $($tokens)*)?;
+        }
+    }
+
     let header = r##"<!DOCTYPE html>
 <html><head>
 <meta http-equiv="content-type" content="text/html; charset=UTF-8"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style type="text/css">body{
@@ -104,17 +110,80 @@ a:visited {color: #666;}
 </style></head>
 <body>"##;
 
-    writeln!(&mut writer, "{}", header)?;
+    w!("{}", header);
 
-    for page in pages.iter() {        
-        writeln!(&mut writer, "<h2>{}</h2>", page.title)?;
+    
+    let config = parse_wiki_text::Configuration::default();
+    
 
-        writeln!(&mut writer, "<p>{}</p>", page.text)?;
+    for page in pages.iter() {
+        w!("<h2>{}</h2>", &page.title);
 
-        writeln!(&mut writer, "<hr/>")?;
+        let parsed = config.parse(&page.text);
+
+        if verbose && parsed.warnings.len() > 0 {
+            eprintln!("{:#?}", parsed.warnings);
+        }
+
+        write_nodes(&mut writer, &page.text, &parsed.nodes)?;
+
+        w!("<hr style=\"height: 0.0625em;background-color: #888;\" />");
     }
     
-    writeln!(&mut writer, "</body></html>")?;
+    w!("</body></html>");
+
+    Ok(())
+}
+
+use parse_wiki_text::Node;
+fn write_nodes<'node>(
+    writer: &mut BufWriter<&File>, 
+    page_text: &str,
+    nodes: &[Node<'node>]
+) -> Res<()> {
+
+    use parse_wiki_text::Positioned;
+
+    macro_rules! w {
+        ($($tokens: tt)*) => {
+            write!(writer, $($tokens)*)?;
+        }
+    }
+
+    for node in nodes.iter() {
+        use Node::*;
+
+        match node {
+            Preformatted {
+                nodes,
+                ..
+            } => {
+                w!("<pre>");
+                write_nodes(writer, page_text, nodes)?;
+                w!("</pre>");
+            },
+            Heading {
+                level,
+                nodes,
+                ..
+            } => {
+                // we use h2 for the titles.
+                let l = level + 2;
+                w!("<h{}>", l);
+                write_nodes(writer, page_text, nodes)?;
+                w!("</h{}>", l);
+            },
+            HorizontalDivider {..} => {
+                w!("<hr />");
+            }
+            _ => {
+                w!(
+                    "{}", 
+                    &page_text[node.start()..node.end()]
+                );
+            }
+        }
+    }
 
     Ok(())
 }
