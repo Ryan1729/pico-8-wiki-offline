@@ -1,10 +1,13 @@
 use std::{
+    collections::BTreeMap,
     env::current_dir,
-    path::PathBuf,
+    io::{BufWriter, Write},
     fs::{
         create_dir_all,
         File,
-    }
+        OpenOptions,
+    },
+    path::PathBuf,
 };
 
 type Res<A> = Result<A, Box<dyn std::error::Error>>; 
@@ -59,7 +62,9 @@ fn main() -> Res<()> {
         confirm_out_dir(PathBuf::from(s))?
     } else {
         let mut default_dir = current_dir()?;
-        default_dir.push(PathBuf::from(EXE_NAME));
+        default_dir.push(
+            PathBuf::from(format!("{}-output", EXE_NAME))
+        );
 
         confirm_out_dir(default_dir)?
     };
@@ -73,7 +78,66 @@ fn main() -> Res<()> {
         pages.extend(new_pages.into_iter());
     }
 
+    let mut page_map: BTreeMap<String, String> = BTreeMap::new();
+
+    for page in pages.iter() {
+        let key = munge_to_valid_rust_mod_name(&page.title);
+        if page_map.contains_key(&key) {
+            return Err(
+                format!(
+                    "pages {} and {} both munge to {}!",
+                    page.title,
+                    page_map.get(&key).unwrap(),
+                    &key
+                ).into()
+            );
+        }
+
+        page_map.insert(
+            key,
+            page.title.clone()
+        );
+    }
+
+    for page in pages.iter() {
+        let mod_name = munge_to_valid_rust_mod_name(&page.title);
+        
+        let mut path = output_dir.join(mod_name);
+        path.set_extension("rs");
+
+        let file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(path)?;
+
+        let mut writer = BufWriter::new(&file);
+        
+        for line in page.text.lines() {
+            writeln!(&mut writer, "//! {}", line)?;
+        }
+    }
+
     Ok(())
+}
+
+fn munge_to_valid_rust_mod_name(s: &str) -> String {
+    let mut output = s.replace(
+        |c| {
+            !(
+                (c >= 'A' && c <= 'Z')
+                || (c >= 'a' && c <= 'z')
+                || (c >= '0' && c <= '9')
+                || c == '_'
+            )
+        },
+        "_"
+    );
+
+    if output == "_" {
+        output.push_str("munged")
+    }
+
+    output
 }
 
 fn confirm_out_dir(path: PathBuf) -> Res<PathBuf> {
