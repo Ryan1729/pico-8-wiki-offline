@@ -1,6 +1,10 @@
 use std::{
+    env::current_dir,
     path::PathBuf,
-    fs::File,
+    fs::{
+        create_dir_all,
+        File,
+    }
 };
 
 type Res<A> = Result<A, Box<dyn std::error::Error>>; 
@@ -18,6 +22,7 @@ fn main() -> Res<()> {
     let mut verbose = false;
     let mut output_dir_spec = None;
 
+    let mut files = Vec::new();
 
     while let Some(s) = args.next() {
         if s == "--help" {
@@ -37,22 +42,68 @@ fn main() -> Res<()> {
             }
             continue;
         }
+
         let path = PathBuf::from(s);
-        println!("Processing: {}", path.display());
+
+        println!("found input file: {}", path.display());
         
         let path = path.canonicalize()?;
         println!("    ({})", path.display());
 
         let file = File::open(path)?;
 
-        process_file(file, verbose)?;
+        files.push(file);
+    }
+
+    let output_dir = if let Some(s) = output_dir_spec {
+        confirm_out_dir(PathBuf::from(s))?
+    } else {
+        let mut default_dir = current_dir()?;
+        default_dir.push(PathBuf::from(EXE_NAME));
+
+        confirm_out_dir(default_dir)?
+    };
+
+    println!("will output to {}", output_dir.display());
+
+    let mut pages = Vec::new();
+
+    for file in files {
+        let new_pages = extract_pages(file, verbose)?;
+        pages.extend(new_pages.into_iter());
     }
 
     Ok(())
 }
 
-fn process_file(file: File, verbose: bool) -> Res<()> {
+fn confirm_out_dir(path: PathBuf) -> Res<PathBuf> {
+    println!("found output dir: {}", path.display());
+
+    if path.exists() {
+        if !path.is_dir() {
+            return Err(
+                format!(
+                    "{} exists but is not a directory!",
+                    path.display()
+                ).into()
+            );
+        }
+    } else {
+        create_dir_all(&path)?;
+    }
+
+    let path = path.canonicalize()?;
+    println!("    ({})", path.display());
+
+    Ok(path)
+}
+
+type Page = parse_mediawiki_dump::Page;
+
+fn extract_pages(file: File, verbose: bool) -> Res<Vec<Page>> {
     let file = std::io::BufReader::new(file);
+
+    let mut pages = Vec::new();
 
     for result in parse_mediawiki_dump::parse(file) {
         let page = result.map_err(|e| e.to_string())?;
@@ -104,17 +155,21 @@ fn process_file(file: File, verbose: bool) -> Res<()> {
                 }
             }
             _ => {
-                println!(
-                    "The page {title:?} seems to be a content article with byte length {length} and namespace {namespace}.",
-                    title = page.title,
-                    length = page.text.len(),
-                    namespace = page.namespace
-                );
+                if verbose {
+                    println!(
+                        "The page {title:?} seems to be a content article with byte length {length} and namespace {namespace}.",
+                        title = page.title,
+                        length = page.text.len(),
+                        namespace = page.namespace
+                    );
+                }
+
+                pages.push(page);
             }
         }
     }
 
-    Ok(())
+    Ok(pages)
 }
 
 fn print_usage() -> Res<()> {
