@@ -154,6 +154,10 @@ fn write_nodes<'node>(
         }
     }
 
+    let mut is_bold_open = false;
+    let mut is_bold_italic_open = false;
+    let mut is_italic_open = false;
+
     for node in nodes.iter() {
         use Node::*;
 
@@ -180,6 +184,30 @@ fn write_nodes<'node>(
             HorizontalDivider {..} => {
                 w!("<hr />");
             },
+            Bold {..} => {
+                is_bold_open = !is_bold_open;
+                if is_bold_open {
+                    w!("<span style=\"font-weight:bold;\">");
+                } else {
+                    w!("</span>");
+                }
+            },
+            BoldItalic {..} => {
+                is_bold_italic_open = !is_bold_italic_open;
+                if is_bold_italic_open {
+                    w!("<span style=\"font-weight:bold;font-style:italic;\">");
+                } else {
+                    w!("</span>");
+                }
+            },
+            Italic {..} => {
+                is_italic_open = !is_italic_open;
+                if is_italic_open {
+                    w!("<span style=\"font-style:italic;\">");
+                } else {
+                    w!("</span>");
+                }
+            },
             Tag {
                 name,
                 nodes,
@@ -193,6 +221,30 @@ fn write_nodes<'node>(
                     );
                     w!("</pre>");
                 }
+            },
+            OrderedList {
+                items,
+                ..
+            } => {
+                w!("<ol>");
+                for item in items {
+                    w!("<li>");
+                    write_nodes(writer, page_text, &item.nodes)?;
+                    w!("</li>");
+                }
+                w!("</ol>");
+            },
+            UnorderedList {
+                items,
+                ..
+            } => {
+                w!("<ul>");
+                for item in items {
+                    w!("<li>");
+                    write_nodes(writer, page_text, &item.nodes)?;
+                    w!("</li>");
+                }
+                w!("</ul>");
             },
             Category{..} => {},
             _ => {
