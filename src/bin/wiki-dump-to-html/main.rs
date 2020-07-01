@@ -49,20 +49,45 @@ fn process_file(file: File, verbose: bool) -> Res<()> {
         const TALK: Namespace = 1;
         const USER: Namespace = 2;
         const USER_TALK: Namespace = 3;
+        const FILE: Namespace = 6;
+        const MEDIA_WIKI: Namespace = 8;
+
+        const TEMPLATE: Namespace = 10;
+        const CATEGORY: Namespace = 14;
+        const CATEGORY_TALK: Namespace = 15;
+
+        //const USER_BLOG: Namespace = 500;
+        const USER_BLOG_COMMENT: Namespace = 501;
+        const BLOG: Namespace = 502;
 
         const MESSAGE_WALL: Namespace = 1200;
         const THREAD: Namespace = 1201;
         const MESSAGE_WALL_GREETING: Namespace = 1202;
 
+        const BOARD: Namespace = 2000;
+
         match page.namespace {
-            TALK 
-            | USER 
-            | USER_TALK 
-            | MESSAGE_WALL 
-            | THREAD 
-            | MESSAGE_WALL_GREETING => {
+            TALK
+            | USER
+            | USER_TALK
+            | MESSAGE_WALL
+            | THREAD
+            | MESSAGE_WALL_GREETING
+            | USER_BLOG_COMMENT
+            | TEMPLATE
+            | CATEGORY
+            | CATEGORY_TALK
+            | BOARD
+            | MEDIA_WIKI
+            | BLOG => {
                 if verbose {
                     println!("Seems like the page {:?} is meta-content, not true content.", page.title);
+                    println!("{:#?}", page);
+                }
+            }
+            FILE => {
+                if verbose {
+                    println!("The page {:?} seems to be a file which we are skipping for now.", page.title);
                     println!("{:#?}", page);
                 }
             }
