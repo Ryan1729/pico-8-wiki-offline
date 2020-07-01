@@ -5,6 +5,8 @@ use std::{
 
 type Res<A> = Result<A, Box<dyn std::error::Error>>; 
 
+const EXE_NAME: &str = "wiki-dump-to-html";
+
 fn main() -> Res<()> {
     let mut args = std::env::args();
     if args.len() < 2 {
@@ -14,6 +16,8 @@ fn main() -> Res<()> {
     args.next(); // exe name
 
     let mut verbose = false;
+    let mut output_dir_spec = None;
+
 
     while let Some(s) = args.next() {
         if s == "--help" {
@@ -25,6 +29,14 @@ fn main() -> Res<()> {
             continue;
         }
 
+        if s == "--output-dir" {
+            output_dir_spec = args.next();
+            if output_dir_spec.is_none() {
+                println!("Missing output dir!");
+                return print_usage();
+            }
+            continue;
+        }
         let path = PathBuf::from(s);
         println!("Processing: {}", path.display());
         
@@ -106,6 +118,9 @@ fn process_file(file: File, verbose: bool) -> Res<()> {
 }
 
 fn print_usage() -> Res<()> {
-    println!("USAGE: wiki-dump-to-html [--verbose] FILENAME1 [FILENAME2 [...]]");
+    println!(
+        "USAGE: {} [--verbose] [--output-dir DIRNAME] FILENAME1 [FILENAME2 [...]]",
+        EXE_NAME
+    );
     Ok(())
 }
