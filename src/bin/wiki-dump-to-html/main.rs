@@ -78,31 +78,48 @@ fn main() -> Res<()> {
         pages.extend(new_pages.into_iter());
     }
 
+    let page_pairs: Vec<_> = pages
+        .into_iter()
+        .map(|page| {
+            let name = munge_to_valid_rust_mod_name(&page.title);
+            (page, name)
+        })
+        .collect();
+
     let mut page_map: BTreeMap<String, String> = BTreeMap::new();
 
-    for page in pages.iter() {
-        let key = munge_to_valid_rust_mod_name(&page.title);
-        if page_map.contains_key(&key) {
+    for (page, key) in page_pairs.iter() {
+        if page_map.contains_key(key) {
             return Err(
                 format!(
                     "pages {} and {} both munge to {}!",
                     page.title,
-                    page_map.get(&key).unwrap(),
+                    page_map.get(key).unwrap(),
                     &key
                 ).into()
             );
         }
 
         page_map.insert(
-            key,
+            key.to_owned(),
             page.title.clone()
         );
     }
 
-    for page in pages.iter() {
-        let mod_name = munge_to_valid_rust_mod_name(&page.title);
-        
-        let mut path = output_dir.join(mod_name);
+    let src_dir = confirm_out_dir(output_dir.join("src"))?;
+
+    let mut lib_path = src_dir.join("lib");
+    lib_path.set_extension("rs");
+
+    let lib_file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .open(lib_path)?;
+
+    let mut lib_writer = BufWriter::new(&lib_file);
+
+    for (page, mod_name) in page_pairs.iter() {
+        let mut path = src_dir.join(mod_name);
         path.set_extension("rs");
 
         let file = OpenOptions::new()
@@ -115,6 +132,8 @@ fn main() -> Res<()> {
         for line in page.text.lines() {
             writeln!(&mut writer, "//! {}", line)?;
         }
+
+        writeln!(&mut lib_writer, "pub mod {};", mod_name)?;
     }
 
     Ok(())
@@ -133,7 +152,7 @@ fn munge_to_valid_rust_mod_name(s: &str) -> String {
         "_"
     );
 
-    if output == "_" {
+    if output == "_" || output == "lib" {
         output.push_str("munged")
     }
 
@@ -141,7 +160,7 @@ fn munge_to_valid_rust_mod_name(s: &str) -> String {
 }
 
 fn confirm_out_dir(path: PathBuf) -> Res<PathBuf> {
-    println!("found output dir: {}", path.display());
+    println!("probing output dir: {}", path.display());
 
     if path.exists() {
         if !path.is_dir() {
