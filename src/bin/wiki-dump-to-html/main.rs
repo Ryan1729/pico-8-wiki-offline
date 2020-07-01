@@ -107,6 +107,10 @@ padding:0 10px
 h1,h2,h3{line-height:1.2}
 a:link {color: #999;}
 a:visited {color: #666;}
+pre {
+    background-color:#1D2B53;
+    color: #aaa;
+}
 </style></head>
 <body>"##;
 
@@ -175,7 +179,22 @@ fn write_nodes<'node>(
             },
             HorizontalDivider {..} => {
                 w!("<hr />");
-            }
+            },
+            Tag {
+                name,
+                nodes,
+                ..
+            } if name == "syntaxhighlight" => {
+                for node in nodes {
+                    w!("<pre>");
+                    w!(
+                        "{}", 
+                        &page_text[node.start()..node.end()]
+                    );
+                    w!("</pre>");
+                }
+            },
+            Category{..} => {},
             _ => {
                 w!(
                     "{}", 
